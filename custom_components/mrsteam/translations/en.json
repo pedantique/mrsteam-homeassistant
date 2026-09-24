@@ -1,0 +1,47 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MrSteam iSteamX",
+        "description": "Sign in with your MrSteam app account.",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "model_number": "Model number"
+        },
+        "data_description": {
+          "model_number": "Your generator model, e.g. SU-70. Leave the default if unsure."
+        }
+      },
+      "device": {
+        "title": "Select generator",
+        "data": { "thing_name": "Generator" }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password.",
+      "cannot_connect": "Couldn't reach the MrSteam service.",
+      "no_devices": "No generators were found on this account.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This generator is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": { "scan_interval": "Poll interval (seconds)" },
+        "data_description": {
+          "scan_interval": "How often to read status. Each poll briefly interrupts the wall unit's cloud link (steam operation is unaffected); a longer interval means fewer interruptions."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "remaining_time": { "name": "Remaining time" }
+    }
+  }
+}

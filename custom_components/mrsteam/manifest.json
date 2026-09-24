@@ -1,0 +1,15 @@
+{
+  "domain": "mrsteam",
+  "name": "MrSteam iSteamX",
+  "codeowners": ["@pedantique"],
+  "config_flow": true,
+  "documentation": "https://github.com/pedantique/mrsteam-homeassistant",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/pedantique/mrsteam-homeassistant/issues",
+  "requirements": [
+    "pycognito==2024.5.1",
+    "boto3>=1.34",
+    "awsiotsdk>=1.21.0"
+  ],
+  "version": "0.1.0"
+}
