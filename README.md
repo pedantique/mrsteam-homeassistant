@@ -64,21 +64,15 @@ Practical implications:
 - Status in HA can be up to one poll interval stale. After a command the switch
   updates optimistically and a confirming read follows a few seconds later.
 
-## Why this integration exists — a note on security
+## Why this integration exists
 
-This project began as security research into MrSteam's cloud. A researcher found
-that the backend failed to isolate customers from one another: **any** logged-in
-app user could read **every** connected generator's live telemetry (including
-household profile details) and start or stop **any** unit worldwide — a privacy
-breach and a physical-safety issue.
+This project grew out of independent research into how the MrSteam app talks to
+its cloud. It only ever communicates with **your own** account and **your own**
+device, using the same access the official app uses.
 
-It was disclosed responsibly through **CERT/CC**, escalated to **CISA**, and
-tracked as **[VU#440636](https://kb.cert.org/vuls/id/440636)** (rated Critical).
-MrSteam has since **fixed** the flaw, and the fix has been independently verified.
-This integration is the benign byproduct of that work: it only ever touches
-**your own** device, using the same properly-scoped access the app now uses. No
-exploit details are published here. If you own an iSteamX, make sure your app is
-up to date.
+It has **not** been tested against any hardware other than the author's own unit,
+so expect rough edges — please [open an issue](https://github.com/pedantique/mrsteam-homeassistant/issues)
+if something misbehaves, ideally with logs and your model number.
 
 ## Notes / known rough edges
 
