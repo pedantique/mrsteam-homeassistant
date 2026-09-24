@@ -6,6 +6,9 @@ This is an unofficial integration built by reverse-engineering the MrSteam app's
 cloud API (AWS Cognito + API Gateway + AWS IoT device shadows). It talks to the
 same MrSteam cloud the app uses — no local device API exists.
 
+_Developed with AI assistance (Claude). Not affiliated with, endorsed by, or
+supported by MrSteam / Feel Good Inc._
+
 > ⚠️ **Safety.** Steam generators are powerful appliances. Only automate
 > activation when you can be certain the steam room is unoccupied and the door is
 > closed. You are responsible for safe use. This project has no affiliation with
@@ -27,25 +30,55 @@ same MrSteam cloud the app uses — no local device API exists.
 4. Enter your MrSteam app **email** and **password**. If prompted, pick your
    generator. (Model number defaults to `SU-70`; change it if yours differs.)
 
+### About your credentials
+
+The integration signs in to **MrSteam's own cloud** with your app email and
+password (AWS Cognito SRP — the same login the phone app uses) and exchanges them
+for short-lived AWS tokens. Your password is sent only to MrSteam's Cognito
+endpoint and is stored in Home Assistant's config entry on your own server; it is
+not transmitted anywhere else and this project has no server of its own. Because
+there is no local device API, cloud sign-in is the only way to reach the unit.
+
 ## How it works & the one important caveat
 
 MrSteam coordinates controllers at the **device-shadow** level: the wall
 control, the phone app, and this integration all read the shadow's *reported*
 state and write its *desired* state. The generator reconciles whoever wrote last.
 
-However, the AWS IoT **connection** layer only permits one client using the
-required identity (`client_id == thingName`), and your **wall control unit owns
-it**. So this integration never holds a persistent connection — it does a quick
-*connect → read/command → disconnect* **burst** on each poll and each command,
-exactly like the phone app does when you open it.
+This integration never holds a persistent connection. It does a quick
+*connect → do one thing → disconnect* **burst** for each poll and each command,
+exactly like the phone app does when you open it, using two different IoT client
+identities:
+
+- **Reads** connect as `client_id == thingName` (the only identity allowed to
+  subscribe to the shadow). Your **wall control unit** also uses that identity, so
+  a read briefly (~2 s) bumps the wall unit off the **cloud** — its local
+  operation and any running steam session are **not** affected.
+- **Commands** (start/stop/program) publish from a unique `app-*-dev` client that
+  coexists with the wall unit, so sending a command does **not** disturb it.
 
 Practical implications:
 
-- Each poll/command briefly (~2 s) knocks the wall unit off the **cloud** — its
-  local operation and any running steam session are **not** affected.
-- Increase **Poll interval** (integration Options) to reduce that churn. Default
-  is 60 s; minimum 20 s.
-- Status in HA can be up to one poll interval stale.
+- Increase **Poll interval** (integration Options) to reduce the read churn.
+  Default is 60 s; minimum 20 s.
+- Status in HA can be up to one poll interval stale. After a command the switch
+  updates optimistically and a confirming read follows a few seconds later.
+
+## Why this integration exists — a note on security
+
+This project began as security research into MrSteam's cloud. A researcher found
+that the backend failed to isolate customers from one another: **any** logged-in
+app user could read **every** connected generator's live telemetry (including
+household profile details) and start or stop **any** unit worldwide — a privacy
+breach and a physical-safety issue.
+
+It was disclosed responsibly through **CERT/CC**, escalated to **CISA**, and
+tracked as **[VU#440636](https://kb.cert.org/vuls/id/440636)** (rated Critical).
+MrSteam has since **fixed** the flaw, and the fix has been independently verified.
+This integration is the benign byproduct of that work: it only ever touches
+**your own** device, using the same properly-scoped access the app now uses. No
+exploit details are published here. If you own an iSteamX, make sure your app is
+up to date.
 
 ## Notes / known rough edges
 
