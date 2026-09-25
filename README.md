@@ -9,7 +9,7 @@ same MrSteam cloud the app uses—no local device API exists.
 _Developed with AI assistance (Claude). Not affiliated with, endorsed by, or
 supported by MrSteam / Feel Good Inc._
 
-> ⚠️ **Safety.** Steam generators are powerful appliances. Only automate
+> **Safety.** Steam generators are powerful appliances. Only automate
 > activation when you can be certain the steam room is unoccupied and the door is
 > closed. You are responsible for safe use. This project has no affiliation with
 > MrSteam / Feel Good Inc.
@@ -66,12 +66,23 @@ Practical implications:
 
 ## Why this integration exists
 
-This project grew out of independent research into how the MrSteam app talks to
-its cloud. It only ever communicates with **your own** account and **your own**
-device, using the same access the official app uses.
+While I was working out how to connect my own steam shower to Home Assistant, I
+found that MrSteam's cloud did not keep customers apart from one another. An
+authenticated app user could reach not only their own generator but connected
+iSteamX units belonging to other customers, reading their device data and
+starting or stopping them. I never accessed anyone else's device or data. I
+reported the issue to CISA through CERT/CC's coordination process.
 
-It has **not** been tested against any hardware other than the author's own unit,
-so expect rough edges—please [open an issue](https://github.com/pedantique/mrsteam-homeassistant/issues)
+MrSteam remediated the flaw by 18 September 2026, and I independently verified the
+fix against my own account. It is now published as
+[CVE-2026-95699](https://nvd.nist.gov/vuln/detail/CVE-2026-95699) (CISA advisory
+[VA-26-267-01](https://github.com/cisagov/CSAF/blob/develop/csaf_files/VA/white/2026/va-26-267-01.json),
+CVSS 9.6). This integration is the harmless result of that work: it only ever
+talks to your own account and your own device, using the same properly-scoped
+access the app now uses. No exploit details are included here.
+
+It has **not** been tested against any hardware other than my own unit, so expect
+rough edges—please [open an issue](https://github.com/pedantique/mrsteam-homeassistant/issues)
 if something misbehaves, ideally with logs and your model number.
 
 ## Notes / known rough edges
@@ -85,7 +96,9 @@ if something misbehaves, ideally with logs and your model number.
 
 ## Credits
 
-Reverse-engineered and built for personal use. Contributions welcome.
+Reverse-engineered and built by Darren Challis, with AI assistance (Claude). The
+cloud vulnerability found during this work is tracked as CVE-2026-95699 (CISA
+advisory VA-26-267-01). Contributions welcome.
 
 ## License
 
