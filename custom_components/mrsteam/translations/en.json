@@ -16,6 +16,11 @@
       "device": {
         "title": "Select generator",
         "data": { "thing_name": "Generator" }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate MrSteam iSteamX",
+        "description": "The saved credentials for {email} were rejected. Enter the current password to reconnect.",
+        "data": { "password": "Password" }
       }
     },
     "error": {
@@ -25,7 +30,8 @@
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "This generator is already set up."
+      "already_configured": "This generator is already set up.",
+      "reauth_successful": "Re-authentication was successful."
     }
   },
   "options": {
