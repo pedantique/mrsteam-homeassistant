@@ -9,6 +9,18 @@ for anyone browsing the repository directly.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-21
+
+### Fixed
+
+- Network and service errors are no longer mistaken for a wrong password.
+  Re-authentication now starts only when Cognito actually rejects the credentials
+  (for example `NotAuthorizedException`); a DNS failure, timeout or service error
+  at startup or during token renewal is treated as a retryable error instead of
+  prompting for the password. Device discovery likewise now handles timeouts,
+  malformed responses and missing fields as retryable errors rather than raising a
+  raw exception.
+
 ## [0.1.3] - 2026-10-21
 
 ### Fixed
@@ -61,7 +73,8 @@ for anyone browsing the repository directly.
 - Config flow with sign-in and device selection, plus a poll-interval option.
 - HACS and hassfest validation workflow.
 
-[Unreleased]: https://github.com/pedantique/mrsteam-homeassistant/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/pedantique/mrsteam-homeassistant/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/pedantique/mrsteam-homeassistant/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/pedantique/mrsteam-homeassistant/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/pedantique/mrsteam-homeassistant/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/pedantique/mrsteam-homeassistant/compare/v0.1.0...v0.1.1

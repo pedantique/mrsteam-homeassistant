@@ -19,7 +19,6 @@ import json
 import logging
 import threading
 import time
-import urllib.error
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
@@ -27,6 +26,7 @@ from typing import Any
 
 import boto3
 from botocore.config import Config as BotoConfig
+from botocore.exceptions import ClientError
 
 from .const import (
     APP_CLIENT_ID,
@@ -44,6 +44,18 @@ _LOGGER = logging.getLogger(__name__)
 
 # Lazily imported awscrt/awsiot so import failures surface clearly.
 _CRED_SKEW = 300  # refresh AWS creds this many seconds before expiry
+
+# Cognito error codes that mean the credentials themselves are wrong (so we start
+# reauth). Anything else from Cognito (network, throttling, service errors) is a
+# transient MrSteamError that should be retried, not treated as a bad password.
+_AUTH_ERROR_CODES = frozenset(
+    {
+        "NotAuthorizedException",
+        "UserNotFoundException",
+        "PasswordResetRequiredException",
+        "UserNotConfirmedException",
+    }
+)
 
 
 class MrSteamAuthError(Exception):
@@ -110,8 +122,16 @@ class MrSteamClient:
                 user_pool_region=REGION,
             )
             u.authenticate(password=self.password)
-        except Exception as err:  # noqa: BLE001
-            raise MrSteamAuthError(f"Cognito login failed: {err}") from err
+        except ClientError as err:
+            code = err.response.get("Error", {}).get("Code", "")
+            if code in _AUTH_ERROR_CODES:
+                raise MrSteamAuthError(
+                    f"Cognito rejected the credentials ({code})"
+                ) from err
+            # Throttling, service errors, etc. are transient, not a bad password.
+            raise MrSteamError(f"Cognito request failed ({code or err})") from err
+        except Exception as err:  # noqa: BLE001 — DNS/timeout/pycognito internals
+            raise MrSteamError(f"Could not reach Cognito: {err}") from err
         self._cognito = u
         self._id_token = u.id_token
 
@@ -168,22 +188,25 @@ class MrSteamClient:
         )
         # Never route this through a system proxy.
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        # Catch the transport (OSError covers URLError/TimeoutError), the parse
+        # (ValueError covers JSONDecodeError/UnicodeDecodeError) and a malformed
+        # body (KeyError for a missing thingName); all are retryable, not auth.
         try:
             with opener.open(req, timeout=15) as resp:
                 data = json.loads(resp.read().decode())
-        except urllib.error.URLError as err:
-            raise MrSteamError(f"Device discovery failed: {err}") from err
-        out: list[MrSteamDevice] = []
-        for d in data.get("data", []) or []:
-            out.append(
-                MrSteamDevice(
-                    thing_name=d["thingName"],
-                    device_id=d.get("device_id", d["thingName"]),
-                    name=d.get("device_custom_name") or d["thingName"],
-                    connected=bool(d.get("connected")),
+            out: list[MrSteamDevice] = []
+            for d in data.get("data", []) or []:
+                out.append(
+                    MrSteamDevice(
+                        thing_name=d["thingName"],
+                        device_id=d.get("device_id", d["thingName"]),
+                        name=d.get("device_custom_name") or d["thingName"],
+                        connected=bool(d.get("connected")),
+                    )
                 )
-            )
-        return out
+            return out
+        except (OSError, ValueError, KeyError) as err:
+            raise MrSteamError(f"Device discovery failed: {err}") from err
 
     # -- IoT shadow (burst) --------------------------------------------------
     def _connect(self, client_id: str):
