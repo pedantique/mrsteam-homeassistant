@@ -20,6 +20,11 @@ for anyone browsing the repository directly.
   retryable update failure, and a failed start, stop or program command now shows
   a clear message instead of a raw traceback.
 
+### Changed
+
+- Declare third-party log namespaces (`loggers` in the manifest) so verbosity can
+  be tuned, and align `strings.json` with the English translations.
+
 ## [0.1.2] - 2026-10-20
 
 ### Added
