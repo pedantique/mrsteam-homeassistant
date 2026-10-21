@@ -24,8 +24,10 @@ supported by MrSteam / Feel Good Inc._
 
 ## Installation (HACS)
 
-1. HACS → ⋮ → **Custom repositories** → add this repo, category **Integration**.
-2. Install **MrSteam iSteamX**, restart Home Assistant.
+1. In **HACS**, search for **MrSteam iSteamX** and install it. (If it does not
+   appear yet, add this repository as a HACS **custom repository** with category
+   **Integration**, then install it.)
+2. Restart Home Assistant.
 3. **Settings → Devices & Services → Add Integration → MrSteam iSteamX.**
 4. Enter your MrSteam app **email** and **password**. If prompted, pick your
    generator. (Model number defaults to `SU-70`; change it if yours differs.)
