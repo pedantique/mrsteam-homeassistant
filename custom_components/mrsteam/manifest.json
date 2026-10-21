@@ -6,6 +6,7 @@
   "documentation": "https://github.com/pedantique/mrsteam-homeassistant",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/pedantique/mrsteam-homeassistant/issues",
+  "loggers": ["boto3", "botocore", "awscrt", "awsiot", "pycognito"],
   "requirements": [
     "pycognito==2024.5.1",
     "boto3>=1.34",
