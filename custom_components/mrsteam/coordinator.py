@@ -8,10 +8,11 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import MrSteamClient, MrSteamDevice, MrSteamError
+from .api import MrSteamAuthError, MrSteamClient, MrSteamDevice, MrSteamError
 from .const import (
     DOMAIN,
     KEY_APP_PROGRAM,
@@ -55,6 +56,9 @@ class MrSteamCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             doc = await self.hass.async_add_executor_job(
                 self.client.get_shadow, self.device.thing_name
             )
+        except MrSteamAuthError as err:
+            # Triggers Home Assistant's reauth flow (ask for a new password).
+            raise ConfigEntryAuthFailed(str(err)) from err
         except MrSteamError as err:
             raise UpdateFailed(str(err)) from err
         state = doc.get("state", {})
@@ -118,21 +122,28 @@ class MrSteamCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         async_call_later(self.hass, _POST_COMMAND_DELAY, _do)
 
+    async def _send_command(self, func) -> None:
+        """Run a blocking API command, surfacing failures to the user."""
+        try:
+            await self.hass.async_add_executor_job(func)
+        except (MrSteamAuthError, MrSteamError) as err:
+            raise HomeAssistantError(str(err)) from err
+
     async def async_set_steam(self, on: bool) -> None:
         """Start or stop steam (command via a unique app-*-dev client)."""
         if on:
             program = self.selected_program
             if program is None:
-                raise MrSteamError(
+                raise HomeAssistantError(
                     "No steam programs available to start; create one in the app first"
                 )
-            await self.hass.async_add_executor_job(
+            await self._send_command(
                 lambda: self.client.update_desired(
                     self.device.thing_name, steam_status=True, program=program
                 )
             )
         else:
-            await self.hass.async_add_executor_job(
+            await self._send_command(
                 lambda: self.client.update_desired(
                     self.device.thing_name, steam_status=False
                 )
@@ -143,10 +154,8 @@ class MrSteamCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_set_program(self, name: str) -> None:
         program = self.program_by_name(name)
         if program is None:
-            raise MrSteamError(f"Unknown program: {name}")
-        await self.hass.async_add_executor_job(
-            lambda: self.client.update_desired(
-                self.device.thing_name, program=program
-            )
+            raise HomeAssistantError(f"Unknown program: {name}")
+        await self._send_command(
+            lambda: self.client.update_desired(self.device.thing_name, program=program)
         )
         self._refresh_after_settle()

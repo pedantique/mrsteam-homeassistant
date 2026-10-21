@@ -132,13 +132,18 @@ class MrSteamClient:
         now = time.time()
         if self._creds and self._creds.expiration - _CRED_SKEW > now:
             return self._creds
-        id_token = self._valid_id_token()
-        ci = boto3.client(
-            "cognito-identity", region_name=REGION, config=BotoConfig(proxies={})
-        )
-        logins = {LOGIN_PROVIDER: id_token}
-        iid = ci.get_id(IdentityPoolId=IDENTITY_POOL_ID, Logins=logins)["IdentityId"]
-        c = ci.get_credentials_for_identity(IdentityId=iid, Logins=logins)["Credentials"]
+        id_token = self._valid_id_token()  # may raise MrSteamAuthError
+        try:
+            ci = boto3.client(
+                "cognito-identity", region_name=REGION, config=BotoConfig(proxies={})
+            )
+            logins = {LOGIN_PROVIDER: id_token}
+            iid = ci.get_id(IdentityPoolId=IDENTITY_POOL_ID, Logins=logins)["IdentityId"]
+            c = ci.get_credentials_for_identity(
+                IdentityId=iid, Logins=logins
+            )["Credentials"]
+        except Exception as err:  # noqa: BLE001 (botocore/network)
+            raise MrSteamError(f"Could not obtain AWS credentials: {err}") from err
         self._creds = _Creds(
             access_key=c["AccessKeyId"],
             secret_key=c["SecretKey"],
@@ -185,19 +190,22 @@ class MrSteamClient:
         from awscrt import auth, mqtt  # noqa: PLC0415
         from awsiot import mqtt_connection_builder  # noqa: PLC0415
 
-        creds = self._aws_creds()
-        provider = auth.AwsCredentialsProvider.new_static(
-            creds.access_key, creds.secret_key, creds.session_token
-        )
-        conn = mqtt_connection_builder.websockets_with_default_aws_signing(
-            endpoint=IOT_ENDPOINT,
-            region=REGION,
-            credentials_provider=provider,
-            client_id=client_id,
-            clean_session=True,
-            keep_alive_secs=30,
-        )
-        conn.connect().result()
+        creds = self._aws_creds()  # may raise MrSteamAuthError / MrSteamError
+        try:
+            provider = auth.AwsCredentialsProvider.new_static(
+                creds.access_key, creds.secret_key, creds.session_token
+            )
+            conn = mqtt_connection_builder.websockets_with_default_aws_signing(
+                endpoint=IOT_ENDPOINT,
+                region=REGION,
+                credentials_provider=provider,
+                client_id=client_id,
+                clean_session=True,
+                keep_alive_secs=30,
+            )
+            conn.connect().result()
+        except Exception as err:  # noqa: BLE001 (awscrt)
+            raise MrSteamError(f"IoT connection failed: {err}") from err
         return conn, mqtt
 
     @staticmethod
@@ -209,8 +217,9 @@ class MrSteamClient:
     def get_shadow(self, thing_name: str, timeout: float = 8.0) -> dict[str, Any]:
         """Fetch the full shadow document in a short burst."""
         with self._lock:
-            conn, mqtt = self._connect(thing_name)
+            conn = None
             try:
+                conn, mqtt = self._connect(thing_name)
                 box: dict[str, Any] = {}
                 ev = threading.Event()
 
@@ -232,11 +241,16 @@ class MrSteamClient:
                 if not ev.wait(timeout):
                     raise MrSteamError("Timed out reading shadow")
                 return box["doc"]
+            except (MrSteamAuthError, MrSteamError):
+                raise
+            except Exception as err:  # noqa: BLE001 (awscrt)
+                raise MrSteamError(f"Shadow read failed: {err}") from err
             finally:
-                try:
-                    conn.disconnect().result()
-                except Exception:  # noqa: BLE001
-                    pass
+                if conn is not None:
+                    try:
+                        conn.disconnect().result()
+                    except Exception:  # noqa: BLE001
+                        pass
 
     def update_desired(
         self,
@@ -271,18 +285,22 @@ class MrSteamClient:
             # not subscribe), and it does NOT collide with the wall unit, so the
             # device stays online and receives the delta. The QoS1 publish ack is
             # our confirmation (we can't subscribe to update/accepted here).
-            conn, mqtt = self._connect(self._command_client_id())
+            conn = None
             try:
+                conn, mqtt = self._connect(self._command_client_id())
                 fut, _ = conn.publish(
                     topic=f"$aws/things/{thing_name}/shadow/update",
                     payload=payload,
                     qos=mqtt.QoS.AT_LEAST_ONCE,
                 )
                 fut.result(timeout=timeout)
+            except (MrSteamAuthError, MrSteamError):
+                raise
             except Exception as err:  # noqa: BLE001
                 raise MrSteamError(f"Command publish failed: {err}") from err
             finally:
-                try:
-                    conn.disconnect().result()
-                except Exception:  # noqa: BLE001
-                    pass
+                if conn is not None:
+                    try:
+                        conn.disconnect().result()
+                    except Exception:  # noqa: BLE001
+                        pass
